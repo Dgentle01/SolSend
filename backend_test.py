@@ -181,7 +181,38 @@ def test_validate_recipients():
         print_result("POST /api/validate-recipients (invalid)", "FAIL", f"Exception: {str(e)}")
         results.append(False)
     
-    # Test 3: Edge cases
+    # Test 3: Borderline invalid addresses (pass Pydantic but fail endpoint validation)
+    try:
+        # Use addresses that are valid base58 but wrong length when decoded
+        borderline_request = {
+            "token_mint": "SOL",
+            "sender_wallet": VALID_SOLANA_ADDRESSES[0],
+            "recipients": [
+                {"wallet_address": "1111111111111111111111111111111", "amount": 1.0},  # 31 chars, valid base58
+                {"wallet_address": VALID_SOLANA_ADDRESSES[0], "amount": 0.0001}  # Valid address, very small amount
+            ]
+        }
+        
+        response = requests.post(f"{BASE_URL}/validate-recipients", json=borderline_request)
+        
+        if response.status_code == 200:
+            data = response.json()
+            # Should have some validation issues
+            if data["invalid_recipients"] > 0:
+                print_result("POST /api/validate-recipients (borderline)", "PASS", f"Correctly identified borderline invalid recipients")
+                results.append(True)
+            else:
+                print_result("POST /api/validate-recipients (borderline)", "FAIL", f"Should identify some invalid recipients: {data}")
+                results.append(False)
+        else:
+            print_result("POST /api/validate-recipients (borderline)", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+            results.append(False)
+            
+    except Exception as e:
+        print_result("POST /api/validate-recipients (borderline)", "FAIL", f"Exception: {str(e)}")
+        results.append(False)
+    
+    # Test 4: Edge cases
     try:
         # Empty recipients list should fail validation
         empty_request = {
