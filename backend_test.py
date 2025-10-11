@@ -181,15 +181,15 @@ def test_validate_recipients():
         print_result("POST /api/validate-recipients (invalid)", "FAIL", f"Exception: {str(e)}")
         results.append(False)
     
-    # Test 3: Borderline invalid addresses (pass Pydantic but fail endpoint validation)
+    # Test 3: Borderline cases (valid format but edge cases)
     try:
-        # Use addresses that are valid base58 but wrong length when decoded
+        # Test with zero amount (should be invalid)
         borderline_request = {
             "token_mint": "SOL",
             "sender_wallet": VALID_SOLANA_ADDRESSES[0],
             "recipients": [
-                {"wallet_address": "1111111111111111111111111111111", "amount": 1.0},  # 31 chars, valid base58
-                {"wallet_address": VALID_SOLANA_ADDRESSES[0], "amount": 0.0001}  # Valid address, very small amount
+                {"wallet_address": VALID_SOLANA_ADDRESSES[0], "amount": 0.0},  # Zero amount should be invalid
+                {"wallet_address": VALID_SOLANA_ADDRESSES[1], "amount": 0.0001}  # Valid small amount
             ]
         }
         
@@ -197,12 +197,12 @@ def test_validate_recipients():
         
         if response.status_code == 200:
             data = response.json()
-            # Should have some validation issues
-            if data["invalid_recipients"] > 0:
-                print_result("POST /api/validate-recipients (borderline)", "PASS", f"Correctly identified borderline invalid recipients")
+            # Should have 1 invalid recipient (zero amount)
+            if data["invalid_recipients"] == 1 and data["valid_recipients"] == 1:
+                print_result("POST /api/validate-recipients (borderline)", "PASS", f"Correctly identified zero amount as invalid")
                 results.append(True)
             else:
-                print_result("POST /api/validate-recipients (borderline)", "FAIL", f"Should identify some invalid recipients: {data}")
+                print_result("POST /api/validate-recipients (borderline)", "FAIL", f"Expected 1 invalid recipient: {data}")
                 results.append(False)
         else:
             print_result("POST /api/validate-recipients (borderline)", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
