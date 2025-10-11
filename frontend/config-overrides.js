@@ -1,4 +1,5 @@
 const webpack = require('webpack');
+const path = require('path');
 
 module.exports = function override(config) {
   const fallback = config.resolve.fallback || {};
@@ -13,6 +14,10 @@ module.exports = function override(config) {
     buffer: require.resolve('buffer'),
   });
   config.resolve.fallback = fallback;
+  config.resolve.alias = {
+    ...config.resolve.alias,
+    '@': path.resolve(__dirname, 'src'),
+  };
   config.plugins = (config.plugins || []).concat([
     new webpack.ProvidePlugin({
       process: 'process/browser',
