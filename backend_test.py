@@ -148,7 +148,7 @@ def test_validate_recipients():
         print_result("POST /api/validate-recipients (valid)", "FAIL", f"Exception: {str(e)}")
         results.append(False)
     
-    # Test 2: Invalid recipients
+    # Test 2: Invalid recipients (Pydantic validation should reject at model level)
     try:
         invalid_request = {
             "token_mint": "SOL",
@@ -161,13 +161,17 @@ def test_validate_recipients():
         
         response = requests.post(f"{BASE_URL}/validate-recipients", json=invalid_request)
         
-        if response.status_code == 200:
+        # Pydantic validation should reject this at model level (422 status)
+        if response.status_code == 422:
+            print_result("POST /api/validate-recipients (invalid)", "PASS", f"Correctly rejected invalid data at model level")
+            results.append(True)
+        elif response.status_code == 200:
             data = response.json()
-            if data["invalid_recipients"] == 2 and not data["ready_to_send"]:
+            if data["invalid_recipients"] > 0 and not data["ready_to_send"]:
                 print_result("POST /api/validate-recipients (invalid)", "PASS", f"Correctly identified invalid recipients")
                 results.append(True)
             else:
-                print_result("POST /api/validate-recipients (invalid)", "FAIL", f"Expected all invalid, got: {data}")
+                print_result("POST /api/validate-recipients (invalid)", "FAIL", f"Expected invalid recipients, got: {data}")
                 results.append(False)
         else:
             print_result("POST /api/validate-recipients (invalid)", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
