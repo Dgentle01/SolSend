@@ -181,9 +181,9 @@ def test_validate_recipients():
         print_result("POST /api/validate-recipients (invalid)", "FAIL", f"Exception: {str(e)}")
         results.append(False)
     
-    # Test 3: Borderline cases (valid format but edge cases)
+    # Test 3: Borderline cases (Pydantic should catch zero amounts)
     try:
-        # Test with zero amount (should be invalid)
+        # Test with zero amount (should be rejected by Pydantic)
         borderline_request = {
             "token_mint": "SOL",
             "sender_wallet": VALID_SOLANA_ADDRESSES[0],
@@ -195,17 +195,12 @@ def test_validate_recipients():
         
         response = requests.post(f"{BASE_URL}/validate-recipients", json=borderline_request)
         
-        if response.status_code == 200:
-            data = response.json()
-            # Should have 1 invalid recipient (zero amount)
-            if data["invalid_recipients"] == 1 and data["valid_recipients"] == 1:
-                print_result("POST /api/validate-recipients (borderline)", "PASS", f"Correctly identified zero amount as invalid")
-                results.append(True)
-            else:
-                print_result("POST /api/validate-recipients (borderline)", "FAIL", f"Expected 1 invalid recipient: {data}")
-                results.append(False)
+        # Pydantic should reject zero amounts at model level (422 status)
+        if response.status_code == 422:
+            print_result("POST /api/validate-recipients (borderline)", "PASS", f"Correctly rejected zero amount at model level")
+            results.append(True)
         else:
-            print_result("POST /api/validate-recipients (borderline)", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+            print_result("POST /api/validate-recipients (borderline)", "FAIL", f"Should reject zero amounts. Status: {response.status_code}")
             results.append(False)
             
     except Exception as e:
