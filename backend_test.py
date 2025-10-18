@@ -12,7 +12,7 @@ from datetime import datetime
 import uuid
 
 # Backend URL from frontend .env
-BASE_URL = "https://solana-pay-hub.preview.emergentagent.com/api"
+BASE_URL = "https://solsend-tech-audit.preview.emergentagent.com/api"
 
 # Test data
 VALID_SOLANA_ADDRESSES = [

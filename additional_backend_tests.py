@@ -6,7 +6,7 @@ Additional edge case tests for Solana Multi-Send API
 import requests
 import json
 
-BASE_URL = "https://solana-pay-hub.preview.emergentagent.com/api"
+BASE_URL = "https://solsend-tech-audit.preview.emergentagent.com/api"
 VALID_ADDRESS = "3ALfiR1TK2JqC18nfCE8vhGqBD86obX8AcV4YgjzmRij"
 
 def test_large_recipient_list():
