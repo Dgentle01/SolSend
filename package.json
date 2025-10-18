@@ -1,0 +1,43 @@
+{
+  "name": "solsend",
+  "version": "1.0.0",
+  "description": "Solana Multi-Send Application - Send SOL & SPL tokens to multiple recipients",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"cd backend && uvicorn server:app --reload --host 0.0.0.0 --port 8001\" \"cd frontend && yarn start\"",
+    "build": "cd frontend && yarn build",
+    "build:frontend": "cd frontend && yarn build", 
+    "build:backend": "cd backend && pip install -r requirements.txt",
+    "start": "cd frontend && yarn start",
+    "test": "cd frontend && yarn test",
+    "deploy:vercel": "vercel --prod",
+    "deploy:netlify": "cd frontend && yarn build && netlify deploy --prod --dir=build",
+    "vercel-build": "cd frontend && yarn install && yarn build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0",
+    "yarn": ">=1.22.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Dgentle01/solsend.git"
+  },
+  "keywords": [
+    "solana",
+    "blockchain",
+    "crypto",
+    "multi-send",
+    "dapp",
+    "web3"
+  ],
+  "author": "Dgentle01",
+  "license": "MIT"
+}
