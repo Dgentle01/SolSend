@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: solsend_mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: solsend
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - solsend_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: solsend_backend
+    restart: unless-stopped
+    environment:
+      - MONGO_URL=mongodb://admin:password@mongodb:27017/solsend?authSource=admin
+      - DB_NAME=solsend
+      - CORS_ORIGINS=http://localhost:3000,https://localhost:3000
+    ports:
+      - "8001:8000"
+    depends_on:
+      - mongodb
+    networks:
+      - solsend_network
+    volumes:
+      - ./backend:/app
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: solsend_frontend
+    restart: unless-stopped
+    environment:
+      - REACT_APP_BACKEND_URL=http://localhost:8001
+      - REACT_APP_SOLANA_NETWORK=devnet
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - solsend_network
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+volumes:
+  mongodb_data:
+
+networks:
+  solsend_network:
+    driver: bridge
