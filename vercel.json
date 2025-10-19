@@ -32,15 +32,12 @@
       "dest": "/frontend/build/index.html"
     }
   ],
-  "env": {
-    "MONGO_URL": "@mongo_url",
-    "DB_NAME": "@db_name",
-    "CORS_ORIGINS": "@cors_origins"
-  },
+  "env": {},
   "build": {
     "env": {
-      "REACT_APP_BACKEND_URL": "https://your-app-name.vercel.app",
-      "REACT_APP_SOLANA_NETWORK": "mainnet-beta"
+      "REACT_APP_SOLANA_NETWORK": "devnet",
+      "REACT_APP_SOLANA_RPC": "https://api.devnet.solana.com",
+      "DEVELOPER_WALLET": "7N2NBbR2bXJkga5HsFUAgAi4rBtAr5VSVJdvkYXq8vxk"
     }
   },
   "functions": {

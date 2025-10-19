@@ -4,16 +4,16 @@
   command = "yarn build"
 
 [build.environment]
-  NODE_VERSION = "18"
+  NODE_VERSION = "22"
   YARN_VERSION = "1.22.22"
-  REACT_APP_BACKEND_URL = "https://your-backend-api.railway.app"
+  REACT_APP_BACKEND_URL = "https://your-app-name.vercel.app"
   REACT_APP_SOLANA_NETWORK = "mainnet-beta"
   GENERATE_SOURCEMAP = "false"
 
 # API Proxy for development/external backend
 [[redirects]]
   from = "/api/*"
-  to = "https://your-backend-api.railway.app/api/:splat"
+  to = "https://your-app-name.vercel.app/api/:splat"
   status = 200
   force = true
 

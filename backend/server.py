@@ -1,7 +1,6 @@
 from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
@@ -12,15 +11,11 @@ from datetime import datetime, timezone
 import base58
 import csv
 import io
+
 from decimal import Decimal
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
-
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
 
 # Create the main app without a prefix
 app = FastAPI(title="Solana Multi-Send API")
@@ -28,8 +23,8 @@ app = FastAPI(title="Solana Multi-Send API")
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
-# Developer wallet for 0.1% fee
-DEVELOPER_WALLET = "3ALfiR1TK2JqC18nfCE8vhGqBD86obX8AcV4YgjzmRij"
+# Developer wallet for 0.1% fee (public key only)
+DEVELOPER_WALLET = os.environ.get('DEVELOPER_WALLET', '7N2NBbR2bXJkga5HsFUAgAi4rBtAr5VSVJdvkYXq8vxk')
 DEVELOPER_FEE_PERCENT = 0.001  # 0.1%
 
 # Solana constants
@@ -287,33 +282,8 @@ async def get_token_list():
     
     return {"tokens": tokens}
 
-@api_router.post("/save-transaction", response_model=TransactionHistory)
-async def save_transaction(tx_data: TransactionHistory):
-    """
-    Save transaction history to database.
-    """
-    doc = tx_data.model_dump()
-    doc['timestamp'] = doc['timestamp'].isoformat()
-    
-    await db.transactions.insert_one(doc)
-    return tx_data
 
-@api_router.get("/transaction-history/{wallet_address}")
-async def get_transaction_history(wallet_address: str, limit: int = 50):
-    """
-    Get transaction history for a wallet.
-    """
-    transactions = await db.transactions.find(
-        {"sender_wallet": wallet_address},
-        {"_id": 0}
-    ).sort("timestamp", -1).limit(limit).to_list(limit)
-    
-    # Convert timestamps back
-    for tx in transactions:
-        if isinstance(tx['timestamp'], str):
-            tx['timestamp'] = datetime.fromisoformat(tx['timestamp'])
-    
-    return {"transactions": transactions}
+## Removed transaction history endpoints and database code (no database required)
 
 # Include the router in the main app
 app.include_router(api_router)
@@ -321,7 +291,7 @@ app.include_router(api_router)
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -333,6 +303,4 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    client.close()
+# No database client in no-DB setup; nothing to close on shutdown.

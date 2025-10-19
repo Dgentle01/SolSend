@@ -20,7 +20,6 @@
 
 ### Backend
 - **FastAPI** - Modern Python web framework
-- **MongoDB** - Document database with Motor async driver
 - **Pydantic** - Data validation and settings management
 - **Solana** - Base58 address validation and blockchain integration
 
@@ -41,9 +40,8 @@
 
 ### Prerequisites
 
-- **Node.js** >= 18.0.0
+- **Node.js** >= 22.0.0 (recommended)
 - **Python** >= 3.11
-- **MongoDB** (local or Atlas)
 - **Yarn** package manager
 
 ### Local Development
@@ -68,11 +66,9 @@
 
 3. **Setup environment variables**
    ```bash
-   # Copy example environment files
-   cp .env.example .env
-   cp frontend/.env.development frontend/.env
-   cp backend/.env.example backend/.env
-   
+   # Copy example environment files (frontend only)
+   cp frontend/.env.example frontend/.env
+    
    # Edit the files with your configuration
    ```
 
@@ -106,26 +102,17 @@ docker-compose down
 
 ## 🌐 Deployment
 
-### Option 1: Vercel (Recommended for Full-Stack)
+### Option 1: Vercel (Recommended)
 
-1. **Setup MongoDB Atlas**
-   ```bash
-   # Create a MongoDB Atlas cluster
-   # Get connection string: mongodb+srv://username:password@cluster.mongodb.net/
-   ```
+Vercel can host the static frontend and run the FastAPI backend as serverless functions (no database required).
 
-2. **Deploy to Vercel**
+1. **Deploy to Vercel**
    ```bash
    # Install Vercel CLI
    npm i -g vercel
-   
+
    # Deploy
    vercel --prod
-   
-   # Set environment variables in Vercel dashboard:
-   MONGO_URL=mongodb+srv://...
-   DB_NAME=solsend_production
-   CORS_ORIGINS=https://your-app.vercel.app
    ```
 
 ### Option 2: Netlify (Frontend) + Railway/Heroku (Backend)
@@ -160,10 +147,11 @@ docker-compose -f docker-compose.prod.yml up -d
 ## 📋 Environment Variables
 
 ### Backend (.env)
+The backend is serverless and does not require a database for the default flow. If you later add persistence, configure database secrets separately.
 ```bash
-MONGO_URL=mongodb://localhost:27017
-DB_NAME=solsend
+# Example: CORS origins (comma-separated)
 CORS_ORIGINS=http://localhost:3000,https://yourapp.com
+DEVELOPER_WALLET=7N2NBbR2bXJkga5HsFUAgAi4rBtAr5VSVJdvkYXq8vxk
 ```
 
 ### Frontend (.env)
@@ -205,8 +193,8 @@ yarn test
 
 ### End-to-End Testing
 ```bash
-# Run with test database
-MONGO_URL=mongodb://localhost:27017/test yarn dev
+# Use devnet RPC and test wallets when running end-to-end locally
+REACT_APP_SOLANA_RPC=https://api.devnet.solana.com yarn dev
 ```
 
 ## 📊 API Documentation
@@ -218,8 +206,7 @@ MONGO_URL=mongodb://localhost:27017/test yarn dev
 - `POST /api/validate-recipients` - Validate wallet addresses
 - `POST /api/estimate-fees` - Calculate transaction costs
 - `POST /api/parse-csv` - Parse CSV recipient file
-- `POST /api/save-transaction` - Save transaction history
-- `GET /api/transaction-history/{wallet}` - Get transaction history
+ (Transaction persistence disabled in no-DB setup)
 
 ### Example API Usage
 

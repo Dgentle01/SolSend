@@ -24,21 +24,43 @@ import {
   PublicKey,
   LAMPORTS_PER_SOL
 } from '@solana/web3.js';
+import { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction as splCreateTransfer } from '@solana/spl-token';
+import feeUtils from './utils/fee';
+import TokenSelector from './components/TokenSelector';
 import '@solana/wallet-adapter-react-ui/styles.css';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+// Compute API base: prefer REACT_APP_BACKEND_URL if set (useful for local dev),
+// otherwise default to the monorepo '/api' route in production.
+// When developing locally (NODE_ENV=development) and no env provided, default to http://localhost:8001/api
+let API = '/api';
+try {
+  const backendEnv = process.env.REACT_APP_BACKEND_URL;
+  if (backendEnv && backendEnv.length > 0) {
+    API = backendEnv.replace(/\/$/, '') + '/api';
+  } else if (process.env.NODE_ENV === 'development') {
+    API = 'http://localhost:8001/api';
+  }
+} catch (e) {
+  API = '/api';
+}
 
-const DEVELOPER_WALLET = '3ALfiR1TK2JqC18nfCE8vhGqBD86obX8AcV4YgjzmRij';
+const DEVELOPER_WALLET = process.env.REACT_APP_DEV_WALLET || '7N2NBbR2bXJkga5HsFUAgAi4rBtAr5VSVJdvkYXq8vxk';
 
 function MultiSendApp() {
   const { connection } = useConnection();
   const { publicKey, sendTransaction } = useWallet();
   
-  const [selectedToken, setSelectedToken] = useState('SOL');
+  const [selectedToken, setSelectedToken] = useState(() => {
+    try {
+      return localStorage.getItem('selectedToken') || 'SOL';
+    } catch (e) {
+      return 'SOL';
+    }
+  });
   const [recipients, setRecipients] = useState([{ address: '', amount: '' }]);
   const [csvFile, setCsvFile] = useState(null);
   const [tokens, setTokens] = useState([]);
+  const [tokenLoadError, setTokenLoadError] = useState(null);
   const [feeEstimate, setFeeEstimate] = useState(null);
   const [validationResults, setValidationResults] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -49,14 +71,46 @@ function MultiSendApp() {
     loadTokenList();
   }, []);
 
+  // When the user connects their wallet, ensure a sensible default token is selected
+  useEffect(() => {
+    if (publicKey && tokens && tokens.length > 0) {
+      const mintList = tokens.map(t => t.mint);
+      if (!mintList.includes(selectedToken)) {
+        setSelectedToken(tokens[0].mint);
+      }
+    }
+  }, [publicKey, tokens]);
+
+  // Persist selected token to localStorage
+  useEffect(() => {
+    try {
+      if (selectedToken) localStorage.setItem('selectedToken', selectedToken);
+    } catch (e) {
+      // ignore localStorage errors in restricted environments
+    }
+  }, [selectedToken]);
+
   const loadTokenList = async () => {
     try {
+      setTokenLoadError(null);
       const response = await axios.get(`${API}/token-list`);
-      setTokens(response.data.tokens);
+      if (response?.data?.tokens) {
+        setTokens(response.data.tokens);
+      } else {
+        setTokenLoadError('Invalid token list response from backend');
+      }
     } catch (error) {
       console.error('Failed to load token list:', error);
+      setTokenLoadError(error.response?.data?.detail || error.message || String(error));
     }
   };
+
+  // If wallet connects after initial mount and tokens are not loaded, try loading again
+  useEffect(() => {
+    if (publicKey && (!tokens || tokens.length === 0)) {
+      loadTokenList();
+    }
+  }, [publicKey]);
 
   const addRecipient = () => {
     setRecipients([...recipients, { address: '', amount: '' }]);
@@ -183,40 +237,113 @@ function MultiSendApp() {
 
       const signatures = [];
 
-      // Send developer fee first
-      setTxStatus(`🔄 Sending developer fee (0.1%)...`);
-      try {
-        const devFeeAmount = feeEstimate.developer_fee;
-        const devFeeTx = new Transaction().add(
-          SystemProgram.transfer({
-            fromPubkey: publicKey,
-            toPubkey: new PublicKey(DEVELOPER_WALLET),
-            lamports: Math.floor(devFeeAmount * LAMPORTS_PER_SOL)
-          })
-        );
-
-        const devFeeSig = await sendTransaction(devFeeTx, connection);
-        await connection.confirmTransaction(devFeeSig, 'confirmed');
-        signatures.push(devFeeSig);
-        setTxStatus(`✅ Developer fee sent: ${devFeeSig.slice(0, 8)}...`);
-      } catch (error) {
-        throw new Error(`Failed to send developer fee: ${error.message}`);
-      }
+      // We'll collect fee in the same token by appending a fee instruction to each batch.
 
       // Process each batch
       for (let i = 0; i < batches.length; i++) {
         setTxStatus(`🔄 Processing batch ${i + 1}/${batches.length}...`);
         
         const transaction = new Transaction();
-        
-        for (const recipient of batches[i]) {
-          transaction.add(
-            SystemProgram.transfer({
-              fromPubkey: publicKey,
-              toPubkey: new PublicKey(recipient.address),
-              lamports: Math.floor(parseFloat(recipient.amount) * LAMPORTS_PER_SOL)
-            })
-          );
+
+        // Build transfer instructions for this batch
+        let batchTotalLamports = 0n;
+        let batchTotalUnits = 0n; // for SPL tokens
+
+        if (selectedToken === 'SOL') {
+          for (const recipient of batches[i]) {
+            const lamports = BigInt(Math.floor(parseFloat(recipient.amount) * LAMPORTS_PER_SOL));
+            batchTotalLamports += lamports;
+            transaction.add(
+              SystemProgram.transfer({
+                fromPubkey: publicKey,
+                toPubkey: new PublicKey(recipient.address),
+                lamports: Number(lamports)
+              })
+            );
+          }
+        } else {
+          const tokenInfo = tokens.find(t => t.mint === selectedToken);
+          if (!tokenInfo) throw new Error('Token info not found for transfers');
+          const mintPubkey = new PublicKey(tokenInfo.mint);
+
+          // derive sender token account
+          const senderTokenAccount = await getAssociatedTokenAddress(mintPubkey, publicKey);
+
+          // helper to convert decimal amount string to smallest unit BigInt
+          const convertToUnits = (amountStr, decimals) => {
+            const parts = amountStr.split('.');
+            const whole = BigInt(parts[0] || '0');
+            const frac = parts[1] || '';
+            const fracPadded = (frac + '0'.repeat(decimals)).slice(0, decimals);
+            return whole * BigInt(10 ** decimals) + BigInt(fracPadded || '0');
+          };
+
+          for (const recipient of batches[i]) {
+            const recipientPub = new PublicKey(recipient.address);
+            const recipientTokenAccount = await getAssociatedTokenAddress(mintPubkey, recipientPub);
+
+            // ensure recipient ATA exists
+            const acctInfo = await connection.getAccountInfo(recipientTokenAccount);
+            if (!acctInfo) {
+              transaction.add(
+                createAssociatedTokenAccountInstruction(
+                  publicKey, // payer
+                  recipientTokenAccount,
+                  recipientPub,
+                  mintPubkey
+                )
+              );
+            }
+
+            const units = convertToUnits(recipient.amount, tokenInfo.decimals);
+            batchTotalUnits += units;
+
+            transaction.add(
+              splCreateTransfer(
+                senderTokenAccount,
+                recipientTokenAccount,
+                publicKey,
+                Number(units)
+              )
+            );
+          }
+        }
+
+        // Append fee instruction(s) depending on selectedToken
+        const devWallet = process.env.REACT_APP_DEV_WALLET || DEVELOPER_WALLET;
+        if (selectedToken === 'SOL') {
+          const feeInstr = feeUtils.buildSolFeeInstruction(publicKey, devWallet, batchTotalLamports, 10n);
+          if (feeInstr) transaction.add(feeInstr);
+        } else {
+          // SPL token flow: find mint info and sender token account
+            const tokenInfo = tokens.find(t => t.mint === selectedToken);
+            if (!tokenInfo) throw new Error('Token info not found for fee calculation');
+
+            const mintPubkey = new PublicKey(tokenInfo.mint);
+            // derive senderTokenAccount via associated token address
+            const { getAssociatedTokenAddress } = await import('@solana/spl-token');
+            const senderTokenAccount = await getAssociatedTokenAddress(mintPubkey, publicKey);
+
+            // helper to convert decimal amount string to smallest unit BigInt
+            const convertToUnits = (amountStr, decimals) => {
+              const parts = amountStr.split('.');
+              const whole = BigInt(parts[0] || '0');
+              const frac = parts[1] || '';
+              const fracPadded = (frac + '0'.repeat(decimals)).slice(0, decimals);
+              return whole * BigInt(10 ** decimals) + BigInt(fracPadded || '0');
+            };
+
+            const totalUnits = batches[i].reduce((acc, r) => acc + convertToUnits(r.amount, tokenInfo.decimals), 0n);
+            const splFeeInstrs = await feeUtils.buildSplFeeInstructions({
+              connection,
+              mintPubkey,
+              senderPubkey: publicKey,
+              senderTokenAccount: senderTokenAccount,
+              devPubkey: devWallet,
+              totalUnitsBigInt: totalUnits,
+              feeBps: 10n
+            });
+          for (const instr of splFeeInstrs) transaction.add(instr);
         }
 
         const signature = await sendTransaction(transaction, connection);
@@ -234,20 +361,8 @@ function MultiSendApp() {
         `Transactions: ${signatures.length}`
       );
 
-      // Save to history
-      try {
-        await axios.post(`${API}/save-transaction`, {
-          sender_wallet: publicKey.toString(),
-          token_mint: selectedToken,
-          recipient_count: validRecipients.length,
-          total_amount: feeEstimate.total_amount,
-          developer_fee: feeEstimate.developer_fee,
-          status: 'confirmed',
-          signatures: signatures
-        });
-      } catch (error) {
-        console.error('Failed to save transaction history:', error);
-      }
+      // No backend persistence configured (no database). Optionally log to console.
+      console.info('Transactions signatures:', signatures);
 
     } catch (error) {
       setTxStatus(`❌ Transaction failed: ${error.message}`);
@@ -283,22 +398,25 @@ function MultiSendApp() {
             {/* Token Selection */}
             <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20">
               <h2 className="text-xl font-semibold text-white mb-4">Select Token</h2>
-              <div className="grid grid-cols-3 gap-3">
-                {tokens.map(token => (
-                  <button
-                    key={token.mint}
-                    onClick={() => setSelectedToken(token.mint)}
-                    className={`p-4 rounded-lg border-2 transition-all ${
-                      selectedToken === token.mint
-                        ? 'border-purple-500 bg-purple-500/20'
-                        : 'border-white/20 bg-white/5 hover:bg-white/10'
-                    }`}
-                  >
-                    <div className="text-white font-semibold">{token.symbol}</div>
-                    <div className="text-gray-300 text-sm">{token.name}</div>
-                  </button>
-                ))}
-              </div>
+              {!publicKey ? (
+                <div className="text-gray-300">Please connect your wallet to choose which token to send.</div>
+              ) : (
+                <div>
+                  {tokenLoadError ? (
+                    <div className="space-y-2">
+                      <div className="text-red-400">Failed to load tokens: {tokenLoadError}</div>
+                      <button
+                        onClick={loadTokenList}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  ) : (
+                    <TokenSelector tokens={tokens} selectedToken={selectedToken} setSelectedToken={setSelectedToken} disabled={!publicKey} />
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Recipients Input */}

@@ -175,7 +175,7 @@ backend:
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Implemented POST /api/save-transaction and GET /api/transaction-history/{wallet_address} endpoints for storing and retrieving transaction records in MongoDB."
+  comment: "Transaction persistence endpoints removed in no-DB setup."
       - working: true
         agent: "testing"
         comment: "COMPREHENSIVE TESTING COMPLETED: ✅ Transaction saving working correctly ✅ Transaction retrieval by wallet address working ✅ MongoDB integration functional ✅ Proper timestamp handling ✅ Transaction data structure preserved correctly"

@@ -12,10 +12,7 @@
 Vercel can handle both frontend and serverless backend in one deployment:
 
 #### Prerequisites
-1. **MongoDB Atlas Account**
-   - Create cluster at [MongoDB Atlas](https://www.mongodb.com/cloud/atlas)
-   - Get connection string: `mongodb+srv://username:password@cluster.mongodb.net/`
-   - Whitelist Vercel IPs (or use 0.0.0.0/0 for simplicity)
+This project does not require a database for the default multi-send flow. If you want persistent transaction history later, you can add a database and configure connection strings in Vercel environment variables.
 
 #### Deploy Steps
 1. **Install Vercel CLI**
