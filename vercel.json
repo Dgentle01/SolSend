@@ -39,10 +39,5 @@
       "REACT_APP_SOLANA_RPC": "https://api.devnet.solana.com",
       "DEVELOPER_WALLET": "7N2NBbR2bXJkga5HsFUAgAi4rBtAr5VSVJdvkYXq8vxk"
     }
-  },
-  "functions": {
-    "backend/vercel_handler.py": {
-      "maxDuration": 30
-    }
   }
 }
