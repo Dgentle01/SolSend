@@ -1,10 +1,8 @@
-from fastapi import FastAPI
-from server import app as fastapi_app
-from mangum import Mangum
+"""Vercel Python entrypoint.
 
-# Vercel serverless handler
-handler = Mangum(fastapi_app)
+Vercel's Python builder will use an ASGI app if the module exposes a top-level
+`app` variable. We already define `app` in `backend/server.py` so simply import
+and re-export it here.
+"""
 
-# Export for Vercel
-def handler_function(event, context):
-    return handler(event, context)
+from server import app  # re-export the FastAPI app for Vercel's ASGI handler

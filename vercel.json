@@ -32,12 +32,13 @@
       "dest": "/frontend/build/index.html"
     }
   ],
-  "env": {},
+  "env": {
+    "DEVELOPER_WALLET": "7N2NBbR2bXJkga5HsFUAgAi4rBtAr5VSVJdvkYXq8vxk"
+  },
   "build": {
     "env": {
       "REACT_APP_SOLANA_NETWORK": "devnet",
-      "REACT_APP_SOLANA_RPC": "https://api.devnet.solana.com",
-      "DEVELOPER_WALLET": "7N2NBbR2bXJkga5HsFUAgAi4rBtAr5VSVJdvkYXq8vxk"
+      "REACT_APP_SOLANA_RPC": "https://api.devnet.solana.com"
     }
   }
 }

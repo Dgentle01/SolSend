@@ -49,4 +49,3 @@ pydantic==2.12.0
 base58==2.1.1
 python-dotenv==1.1.1
 python-multipart==0.0.20
-mangum==0.17.0
